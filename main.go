@@ -7,9 +7,9 @@ import (
 
 func worker(queque []int, id int, jobs <-chan int, results chan<- int) {
 	for j := range jobs {
-		fmt.Println("loket", id, "started  queque", j)
+		fmt.Println("counter", id, "started queque", j)
 		time.Sleep(time.Duration(queque[j-1]) * time.Second)
-		fmt.Println("loket", id, "finished queque", j, queque[j-1], " second")
+		fmt.Println("counter", id, "finished queque", j, " in ", queque[j-1], " second")
 		results <- j
 	}
 }
@@ -38,5 +38,7 @@ func main() {
 	for a := 1; a <= numJobs; a++ {
 		<-results
 	}
+
+	defer fmt.Println("apps closed")
 
 }
