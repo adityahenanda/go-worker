@@ -2,19 +2,34 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"sync"
 	"time"
 )
 
-func worker(queque []int, id int, jobs <-chan int, results chan<- int) {
-	for j := range jobs {
-		fmt.Println("counter", id, "started queque", j)
-		time.Sleep(time.Duration(queque[j-1]) * time.Second)
-		fmt.Println("counter", id, "finished queque", j, " in ", queque[j-1], " second")
-		results <- j
+type Task struct {
+	closed chan struct{}
+	wg     sync.WaitGroup
+}
+
+func (t *Task) Run() {
+	for {
+		select {
+		case <-t.closed:
+			return
+		default:
+			handle()
+		}
 	}
 }
 
-func main() {
+func (t *Task) Stop() {
+	close(t.closed)
+	t.wg.Wait()
+}
+
+func handle() {
 	// # Read integer
 	var i int
 	fmt.Print("Input jumlah loket: ")
@@ -38,7 +53,31 @@ func main() {
 	for a := 1; a <= numJobs; a++ {
 		<-results
 	}
+}
 
-	defer fmt.Println("apps closed")
+func worker(queque []int, id int, jobs <-chan int, results chan<- int) {
+	for j := range jobs {
+		fmt.Println("counter", id, "started queque", j)
+		time.Sleep(time.Duration(queque[j-1]) * time.Second)
+		fmt.Println("counter", id, "finished queque", j, " in ", queque[j-1], " second")
+		results <- j
+	}
+}
 
+func main() {
+	task := &Task{
+		closed: make(chan struct{}),
+	}
+
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt)
+
+	task.wg.Add(1)
+	go func() { defer task.wg.Done(); task.Run() }()
+
+	select {
+	case sig := <-c:
+		fmt.Printf("Got %s signal. Aborting...\n", sig)
+		task.Stop()
+	}
 }
